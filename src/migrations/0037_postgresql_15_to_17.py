@@ -31,11 +31,15 @@ from ..utils.system import free_space_in_directory, space_used_by_directory
 
 logger = getLogger("yunohost.migration")
 
+PREVIOUS_VERSION = "15"
+TARGET_VERSION = "17"
+LINUX_DISTRO_CODENAME = "trixie"
+MIGRATION_NUMBER = 37
 
 class MyMigration(Migration):
-    "Migrate DBs from Postgresql 15 to 17 after migrating to Trixie"
+    f"Migrate DBs from Postgresql {PREVIOUS_VERSION} to {TARGET_VERSION} after migrating to {LINUX_DISTRO_CODENAME.capitalize()}"
 
-    dependencies = ["migrate_to_trixie"]
+    dependencies = [f"migrate_to_{LINUX_DISTRO_CODENAME}"]
 
     def run(self):
         if (
@@ -47,37 +51,37 @@ class MyMigration(Migration):
             logger.info("No YunoHost app seem to require postgresql... Skipping!")
             return
 
-        if not self.package_is_installed("postgresql-15"):
-            logger.warning(m18n.n("migration_0037_postgresql_15_not_installed"))
+        if not self.package_is_installed(f"postgresql-{PREVIOUS_VERSION}"):
+            logger.warning(m18n.n(f"migration_{MIGRATION_NUMBER:04d}_postgresql_{PREVIOUS_VERSION}_not_installed"))
             return
 
-        if not self.package_is_installed("postgresql-17"):
-            raise YunohostValidationError("migration_0037_postgresql_17_not_installed")
+        if not self.package_is_installed(f"postgresql-{TARGET_VERSION}"):
+            raise YunohostValidationError(f"migration_{MIGRATION_NUMBER:04d}_postgresql_{TARGET_VERSION}_not_installed")
 
         # Make sure there's a 15 cluster
         try:
-            self.runcmd("pg_lsclusters | grep -q '^15 '")
+            self.runcmd(f"pg_lsclusters | grep -q '^{PREVIOUS_VERSION} '")
         except Exception:
             logger.warning(
-                "It looks like there's not active 15 cluster, so probably don't need to run this migration"
+                f"It looks like there's not active {PREVIOUS_VERSION} cluster, so probably don't need to run this migration"
             )
             return
 
         if not space_used_by_directory(
-            "/var/lib/postgresql/15"
+            f"/var/lib/postgresql/{PREVIOUS_VERSION}"
         ) > free_space_in_directory("/var/lib/postgresql"):
             raise YunohostValidationError(
-                "migration_0037_not_enough_space", path="/var/lib/postgresql/"
+                f"migration_{MIGRATION_NUMBER:04d}_not_enough_space", path="/var/lib/postgresql/"
             )
 
         self.runcmd("systemctl stop postgresql")
         time.sleep(3)
         self.runcmd(
-            "LC_ALL=C pg_dropcluster --stop 17 main || true"
-        )  # We do not trigger an exception if the command fails because that probably means cluster 17 doesn't exists, which is fine because it's created during the pg_upgradecluster)
+            f"LC_ALL=C pg_dropcluster --stop {TARGET_VERSION} main || true"
+        )  # We do not trigger an exception if the command fails because that probably means cluster TARGET_VERSION doesn't exists, which is fine because it's created during the pg_upgradecluster)
         time.sleep(3)
-        self.runcmd("LC_ALL=C pg_upgradecluster -m upgrade 15 main -v 17")
-        self.runcmd("LC_ALL=C pg_dropcluster --stop 15 main")
+        self.runcmd(f"LC_ALL=C pg_upgradecluster -m upgrade {PREVIOUS_VERSION} main -v {TARGET_VERSION}")
+        self.runcmd(f"LC_ALL=C pg_dropcluster --stop {PREVIOUS_VERSION} main")
         self.runcmd("systemctl start postgresql")
 
     def package_is_installed(self, package_name):
