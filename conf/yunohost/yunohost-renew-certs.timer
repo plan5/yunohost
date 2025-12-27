@@ -1,0 +1,10 @@
+[Unit]
+Description=Renew the HTTPS SSL certificates daily
+
+[Timer]
+OnCalendar=*-*-* 00:00:00
+RandomizedOffsetSec=24h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
