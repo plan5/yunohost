@@ -1,0 +1,6 @@
+# This file is auto-generated
+# Please see /usr/share/yunohost/conf/dnsmasq/resolv.dnsmasq.conf.j2
+{% set resolvers = (custom_resolvers.strip().split(' ') + resolvers.strip().split('\n') | stable_shuffle) | reject("==", "") -%}
+{% for resolver in resolvers %}
+nameserver {{ resolver }}
+{%- endfor %}
