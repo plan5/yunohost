@@ -25,10 +25,7 @@ set -e
 # shellcheck source=../../helpers/helpers
 source /usr/share/yunohost/helpers
 
-do_init_regen() {
-
-    cd /usr/share/yunohost/conf/dnsmasq
-
+_rand_resolvers_list() {
     # Use a seed derived from the machine id and current month
     # This way, the shuffle is random but should be stable accross the same month
     # and make sure the regenconf is idempotent (at least during the same month)
@@ -37,7 +34,19 @@ do_init_regen() {
         cat /etc/machine-id || true
         date +%m%Y
     ) | md5sum)
-    cat plain/resolv.dnsmasq.conf | grep "^nameserver" | shuf --random-source=<(echo "$SEED") > /etc/resolv.dnsmasq.conf
+    cat plain/resolv.dnsmasq.conf | grep "^nameserver" | shuf --random-source=<(echo "$SEED")
+}
+
+do_init_regen() {
+    cd /usr/share/yunohost/conf/dnsmasq
+
+    # The resolver list is randomized with a seed based on the machine + month number
+    # This way, the shuffle is random but should be stable accross the same month
+    # and make sure the regenconf is idempotent (at least during the same month)
+    # i.e. that it doesn't re-shuffle the file everytime we run the regenconf
+    export custom_resolvers=""
+    export resolvers=$(_rand_resolvers_list)
+    ynh_render_template "resolv.dnsmasq.conf.j2" "$pending_dir/etc/resolv.dnsmasq.conf"
     chown root /etc/resolv.dnsmasq.conf
     chmod 644 /etc/resolv.dnsmasq.conf
 
@@ -74,7 +83,7 @@ do_pre_regen() {
     # and make sure the regenconf is idempotent (at least during the same month)
     # i.e. that it doesn't re-shuffle the file everytime we run the regenconf
     export custom_resolvers=""
-    export resolvers="$(sed -n 's|^nameserver \(.*\)|\1|p' plain/resolv.dnsmasq.conf)"
+    export resolvers=$(_rand_resolvers_list)
     ynh_render_template "resolv.dnsmasq.conf.j2" "$pending_dir/etc/resolv.dnsmasq.conf"
 
     # retrieve variables
